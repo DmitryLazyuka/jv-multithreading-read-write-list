@@ -3,45 +3,55 @@ package core.basesyntax;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class ReadWriteList<E> {
     private final List<E> list = new ArrayList<>();
-    private final ReentrantLock lock = new ReentrantLock();
-    private final Condition notEnoughElements = lock.newCondition();
+    private final ReadWriteLock lock = new ReentrantReadWriteLock();
+    private final Condition elementAdded = lock.writeLock().newCondition();
 
     public void add(E element) {
-        lock.lock();
+        lock.writeLock().lock();
         try {
             list.add(element);
-            notEnoughElements.signalAll();
+            elementAdded.signalAll();
         } finally {
-            lock.unlock();
+            lock.writeLock().unlock();
         }
     }
 
     public E get(int index) {
-        lock.lock();
+        lock.readLock().lock();
+        try {
+            if (index >= 0 && index < list.size()) {
+                return list.get(index);
+            }
+        } finally {
+            lock.readLock().unlock();
+        }
+        lock.writeLock().lock();
         try {
             while (index < 0 || index >= list.size()) {
                 try {
-                    notEnoughElements.await();
+                    elementAdded.await();
                 } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
+                    Thread.currentThread().interrupt();
+                    return null;
                 }
             }
             return list.get(index);
         } finally {
-            lock.unlock();
+            lock.writeLock().unlock();
         }
     }
 
     public int size() {
-        lock.lock();
+        lock.readLock().lock();
         try {
             return list.size();
         } finally {
-            lock.unlock();
+            lock.readLock().unlock();
         }
     }
 }
