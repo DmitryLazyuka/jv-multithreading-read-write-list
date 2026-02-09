@@ -2,24 +2,46 @@ package core.basesyntax;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class ReadWriteList<E> {
-    private List<E> list = new ArrayList<>();
-    private ReadWriteLock lock = new ReentrantReadWriteLock();
+    private final List<E> list = new ArrayList<>();
+    private final ReentrantLock lock = new ReentrantLock();
+    private final Condition notEnoughElements = lock.newCondition();
 
     public void add(E element) {
-        // write your code here
+        lock.lock();
+        try {
+            list.add(element);
+            notEnoughElements.signalAll();
+        } finally {
+            lock.unlock();
+        }
     }
 
     public E get(int index) {
-        // write your code here
-        return null;
+        lock.lock();
+        try {
+            while (index < 0 || index >= list.size()) {
+                try {
+                    notEnoughElements.await();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            return list.get(index);
+        } finally {
+            lock.unlock();
+        }
     }
 
     public int size() {
-        // write your code here
-        return 0;
+        lock.lock();
+        try {
+            return list.size();
+        } finally {
+            lock.unlock();
+        }
     }
 }
