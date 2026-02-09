@@ -24,25 +24,12 @@ public class ReadWriteList<E> {
     public E get(int index) {
         lock.readLock().lock();
         try {
-            if (index >= 0 && index < list.size()) {
-                return list.get(index);
-            }
-        } finally {
-            lock.readLock().unlock();
-        }
-        lock.writeLock().lock();
-        try {
-            while (index < 0 || index >= list.size()) {
-                try {
-                    elementAdded.await();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return null;
-                }
+            if (index < 0 || index >= list.size()) {
+                return null;
             }
             return list.get(index);
         } finally {
-            lock.writeLock().unlock();
+            lock.readLock().unlock();
         }
     }
 
